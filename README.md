@@ -13,8 +13,8 @@ Here’s how you can perform a simple slice mapping:
 ```go
 arr := []int{1, 2, 3, 4, 5, 6}
 
-parIter := iter.SliceParMap(&arr, func(a int) int  {
-	return a * 2
+parIter := iter.SliceParMap(&arr, func(i int, v int) int  {
+	return v * 2
 })
 
 _ = parIter.Wait()
@@ -47,7 +47,7 @@ You can pass optional configurations to override the defaults as needed.
 
 ```go
 // Default min chunk size is 512. You can change it based on your needs.
-parIter := iter.SliceParFilter(&arr, func(e int) bool {
-	return e%2 == 0
+parIter := iter.SliceParFilter(&arr, func(i int,  v int) bool {
+	return v%2 == 0
 }, iter.WithMinChunkSize(20))
 ```
