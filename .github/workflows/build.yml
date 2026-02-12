@@ -1,4 +1,4 @@
-name: Go Build Matrix
+name: Build
 
 on:
   push:
