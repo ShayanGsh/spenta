@@ -13,17 +13,17 @@ var (
 type Pool struct {
 	jobs chan Job
 
-	Workers int
+	workers int
 }
 
 func SpentaPool() *Pool {
 	_once.Do(func() {
 		_pool = &Pool{
 			jobs:    make(chan Job, 100),
-			Workers: runtime.NumCPU(),
+			workers: runtime.NumCPU(),
 		}
 
-		for range _pool.Workers {
+		for range _pool.workers {
 			go _pool.worker()
 		}
 	})

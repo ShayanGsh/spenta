@@ -2,6 +2,8 @@ package iter
 
 import "sync"
 
+const MIN_CHUNK_SIZE uint = 512
+
 type ParIter struct {
 	wg *sync.WaitGroup
 }
@@ -10,12 +12,36 @@ func (p *ParIter) Done() {
 	p.wg.Wait()
 }
 
-func ChunkSize(len, workers int) int {
-	targetChunks := workers * 4
-	size := len / targetChunks
+type ParIterOptions struct {
+	MinChunkSize uint
+}
 
-	if size < 1 {
-		return 1
+func DefaultParIterOptions() *ParIterOptions {
+	return &ParIterOptions{
+		MinChunkSize: MIN_CHUNK_SIZE,
+	}
+}
+
+func WithMinChunkSize(size uint) ParIterOptions {
+	return ParIterOptions{
+		MinChunkSize: size,
+	}
+}
+
+func BuildParIterOptions(opts []ParIterOptions) ParIterOptions {
+	o := DefaultParIterOptions()
+
+	for _, opt := range opts {
+		o.MinChunkSize = opt.MinChunkSize
+	}
+
+	return *o
+}
+
+func ChunkSize(len int, minSize uint) int {
+	size := (len + 1) / 2
+	if size > int(minSize) {
+		return ChunkSize(size, minSize)
 	}
 
 	return size
@@ -25,9 +51,9 @@ func ChunkCount(len, chunkSize int) int {
 	return (len + chunkSize - 1) / chunkSize
 }
 
-func SliceChunk[T comparable](slice *[]T, workers int) (int, int, int) {
+func SliceChunk[T comparable](slice *[]T, minChunkSize uint) (int, int, int) {
 	len := len((*slice))
-	chunkSize := ChunkSize(len, workers)
+	chunkSize := ChunkSize(len, minChunkSize)
 	chunkCount := ChunkCount(len, chunkSize)
 
 	return len, chunkSize, chunkCount

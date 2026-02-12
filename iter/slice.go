@@ -6,8 +6,10 @@ import (
 	"github.com/rouzbehsbz/spenta/pool"
 )
 
-func NewSliceParIter[T comparable](slice *[]T, cb func(i int)) *ParIter {
-	len, chunkSize, chunkCount := SliceChunk(slice, pool.SpentaPool().Workers)
+func NewSliceParIter[T comparable](slice *[]T, cb func(i int), opts ...ParIterOptions) *ParIter {
+	options := BuildParIterOptions(opts)
+
+	len, chunkSize, chunkCount := SliceChunk(slice, options.MinChunkSize)
 
 	wg := &sync.WaitGroup{}
 	wg.Add(chunkCount)
@@ -23,19 +25,19 @@ func NewSliceParIter[T comparable](slice *[]T, cb func(i int)) *ParIter {
 	}
 }
 
-func SliceParForEach[T comparable](slice *[]T, cb func(e T)) *ParIter {
+func SliceParForEach[T comparable](slice *[]T, cb func(e T), opts ...ParIterOptions) *ParIter {
 	return NewSliceParIter[T](slice, func(i int) {
 		cb((*slice)[i])
 	})
 }
 
-func SliceParMap[T comparable](slice *[]T, cb func(e T) T) *ParIter {
+func SliceParMap[T comparable](slice *[]T, cb func(e T) T, opts ...ParIterOptions) *ParIter {
 	return NewSliceParIter[T](slice, func(i int) {
 		(*slice)[i] = cb((*slice)[i])
 	})
 }
 
-func SliceParFilter[T comparable](slice *[]T, cb func(e T) bool) *ParIter {
+func SliceParFilter[T comparable](slice *[]T, cb func(e T) bool, opts ...ParIterOptions) *ParIter {
 	return NewSliceParIter[T](slice, func(i int) {
 		s := *slice
 		j := 0

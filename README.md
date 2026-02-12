@@ -11,24 +11,24 @@ spenta is a lightweight and lock-free parallel iterator generator for Go. The li
 Here’s how you can perform a simple slice mapping:
 
 ```go
-	arr := []int{1, 2, 3, 4, 5, 6}
+arr := []int{1, 2, 3, 4, 5, 6}
 
-	parIter := spenta.SliceParMap(&arr, func(a int) int  {
-		return a * 2
-	})
+parIter := iter.SliceParMap(&arr, func(a int) int  {
+	return a * 2
+})
 
-	parIter.Done()
+parIter.Done()
 ```
 
 ## Overview
 spenta divides the original task into multiple subtasks, each performing computation over a portion of the original data. It returns the results exactly as a sequential execution would, but Spenta does it in parallel using multiple goroutines.
 
-- Completely lock-free algorithms allow maximum parallel computation without using locking mechanisms
-- An internal lightweight thread pool automatically spawns worker goroutines based on the number of available CPU cores.
-- Supports multiple iterator operations, including `forEach`, `map` and more.
-- Type-safe closures using Go’s recently introduced generics.
+- Completely lock-free algorithms
+- Automatically spawns workers based on CPU cores.
+- Supports common operations like `forEach`, `map`, and others.
+- Type-safe closures using Go’s generics.
 
-## Iterator Functions
+## Iterator Oprations
 | Operation | Slice | Map |
 |:--:|:--------:|:--------:|
 |`forEach`|✅ | ❌ |
@@ -36,3 +36,17 @@ spenta divides the original task into multiple subtasks, each performing computa
 |`filter`|✅ | ❌ |
 |`reduce`|❌ | ❌ |
 |`find`|❌ | ❌ |
+
+## Optimizations
+
+- Dynamic chunking algorithm based on workload.
+
+## Optional Configurations
+You can pass optional configurations to override the defaults as needed.
+
+```go
+// Default min chunk size is 512. You can change it based on your needs.
+parIter := iter.SliceParFilter(&arr, func(e int) bool {
+	return e%2 == 0
+}, iter.WithMinChunkSize(20))
+```

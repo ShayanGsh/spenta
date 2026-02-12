@@ -11,7 +11,7 @@ func main() {
 
 	parIter := iter.SliceParMap(&arr, func(a int) int {
 		return a * 2
-	})
+	}, iter.WithMinChunkSize(20))
 
 	parIter.Done()
 
