@@ -1,9 +1,8 @@
 package pool
 
 import (
+	"runtime"
 	"sync"
-
-	"github.com/rouzbehsbz/spenta/internal/share"
 )
 
 var (
@@ -13,17 +12,18 @@ var (
 
 type Pool struct {
 	jobs chan Job
+
+	Workers int
 }
 
 func SpentaPool() *Pool {
 	_once.Do(func() {
-		workersCount := share.WorkersCount()
-
 		_pool = &Pool{
-			jobs: make(chan Job),
+			jobs:    make(chan Job, 100),
+			Workers: runtime.NumCPU(),
 		}
 
-		for range workersCount {
+		for range _pool.Workers {
 			go _pool.worker()
 		}
 	})
