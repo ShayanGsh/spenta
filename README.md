@@ -2,6 +2,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/rouzbehsbz/spenta.svg)](https://pkg.go.dev/github.com/rouzbehsbz/spenta)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/rouzbehsbz/spenta)
+[![Build Status](https://github.com/rouzbehsbz/spenta/actions/workflows/build.yml/badge.svg)](https://github.com/rouzbehsbz/spenta/actions/workflows/build.yml)
 
 > Spenta (سپنتا) — pronounced SPEN-ta — a Persian name of Avestan origin meaning “holy,” “pure,” and “life-giving.”
 
