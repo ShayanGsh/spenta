@@ -5,7 +5,10 @@ import (
 	"sync"
 )
 
-const MaxChunkSize uint = 512
+const (
+	MinChunkSize uint = 256
+	MaxChunkSize uint = 4096
+)
 
 type ParIter struct {
 	errors []error
@@ -35,11 +38,19 @@ func (p *ParIter) Wait() error {
 
 type ParIterOptions struct {
 	MaxChunkSize uint
+	MinChunkSize uint
 }
 
 func DefaultParIterOptions() *ParIterOptions {
 	return &ParIterOptions{
 		MaxChunkSize: MaxChunkSize,
+		MinChunkSize: MinChunkSize,
+	}
+}
+
+func WithMinChunkSize(size uint) ParIterOptions {
+	return ParIterOptions{
+		MinChunkSize: size,
 	}
 }
 
@@ -54,6 +65,7 @@ func BuildParIterOptions(opts []ParIterOptions) ParIterOptions {
 
 	for _, opt := range opts {
 		o.MaxChunkSize = opt.MaxChunkSize
+		o.MinChunkSize = opt.MinChunkSize
 	}
 
 	return *o

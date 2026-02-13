@@ -45,8 +45,10 @@ spenta divides the original task into multiple subtasks, each performing computa
 You can pass optional configurations to override the defaults as needed.
 
 ```go
-// Default min chunk size is 512. You can change it based on your needs.
 parIter := iter.SliceParFilter(&arr, func(i int,  v int) bool {
 	return v%2 == 0
-}, iter.WithMaxChunkSize(20))
+},
+	iter.WithMinChunkSize(5),  // Default min chunk size is 256
+	iter.WithMaxChunkSize(20), // Default max chunk size is 4096
+)
 ```

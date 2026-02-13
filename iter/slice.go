@@ -10,7 +10,7 @@ func NewSliceParIter[V any](slice *[]V, cb func(i int, v V), opts ...ParIterOpti
 
 	parIter := NewParIter()
 
-	pool.SpawnJob(0, length, int(options.MaxChunkSize), parIter.wg, parIter.errCh, func(i int) {
+	pool.SpawnJob(0, length, int(options.MaxChunkSize), int(options.MinChunkSize), parIter.wg, parIter.errCh, func(i int) {
 		cb(i, (*slice)[i])
 	})
 
