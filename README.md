@@ -6,7 +6,7 @@
 
 > Spenta (سپنتا) — pronounced SPEN-ta — a Persian name of Avestan origin meaning “holy,” “pure,” and “life-giving.”
 
-spenta is a lightweight and lock-free parallel iterator generator for Go. The library provides a simple and easy-to-use abstraction layer over data parallelism for iterable types such as `slices`.
+spenta is a lightweight and lock-free parallel iterator generator for Go. The library provides a simple and easy-to-use abstraction layer over data parallelism for iterable types such as `slices` and `map`.
 
 Here’s how you can perform a simple slice mapping:
 
@@ -32,9 +32,9 @@ spenta divides the original task into multiple subtasks, each performing computa
 ## Iterator Oprations
 | Operation | Slice | Map |
 |:--:|:--------:|:--------:|
-|`forEach`|✅ | ❌ |
-|`map`|✅ | ❌ |
-|`filter`|✅ | ❌ |
+|`forEach`|✅ |✅ |
+|`map`|✅ |✅ |
+|`filter`|✅ |✅ |
 |`reduce`|❌ | ❌ |
 |`find`|❌ | ❌ |
 
