@@ -54,5 +54,5 @@ func (p *Pool) onJobEnd(job Job) {
 		// but we should ensure its safe and wont spawn infinitely
 	}
 
-	job.wg.Done()
+	job.jobsWg.Done()
 }

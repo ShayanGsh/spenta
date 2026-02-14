@@ -6,59 +6,68 @@ import (
 	"github.com/rouzbehsbz/spenta/pool"
 )
 
-func NewSliceParIter[V any](slice *[]V, cb func(i int, v V), opts ...ParIterOptions) *ParIter {
+func NewSliceParIter[V any](slice *[]V, cb func(start, end int), opts ...ParIterOptions) *ParIter {
 	options := BuildParIterOptions(opts)
 	length := len(*slice)
 
 	parIter := NewParIter()
 
-	pool.SpawnJob(0, length, int(options.MaxChunkSize), int(options.MinChunkSize), parIter.wg, parIter.errCh, func(i int) {
-		cb(i, (*slice)[i])
+	pool.SpawnJob(0, length, int(options.MaxChunkSize), int(options.MinChunkSize), parIter.jobsWg, parIter.errCh, func(start, end int) {
+		cb(start, end)
 	})
 
 	return parIter
 }
 
 func SliceParForEach[V any](slice *[]V, cb func(i int, v V), opts ...ParIterOptions) *ParIter {
-	return NewSliceParIter[V](slice, func(i int, v V) {
-		cb(i, v)
+	p := NewSliceParIter[V](slice, func(start, end int) {
+		for i := start; i < end; i++ {
+			cb(i, (*slice)[i])
+		}
 	}, opts...)
+
+	p.postJobsDone()
+
+	return p
 }
 
 func SliceParMap[V any](slice *[]V, cb func(i int, v V) V, opts ...ParIterOptions) *ParIter {
-	return NewSliceParIter[V](slice, func(i int, v V) {
-		(*slice)[i] = cb(i, v)
+	p := NewSliceParIter[V](slice, func(start, end int) {
+		for i := start; i < end; i++ {
+			(*slice)[i] = cb(i, (*slice)[i])
+		}
 	}, opts...)
+
+	p.postJobsDone()
+
+	return p
 }
 
 func SliceParFilter[V any](slice *[]V, cb func(i int, v V) bool, opts ...ParIterOptions) *ParIter {
-	options := BuildParIterOptions(opts)
-	input := append([]V(nil), (*slice)...)
-	length := len(input)
-	keep := make([]bool, length)
+	merge := []V{}
+	mu := &sync.Mutex{}
 
-	parIter := NewParIter()
-	predicateWG := &sync.WaitGroup{}
+	p := NewSliceParIter(slice, func(start, end int) {
+		local := make([]V, 0, end-start)
 
-	pool.SpawnJob(0, length, int(options.MaxChunkSize), int(options.MinChunkSize), predicateWG, parIter.errCh, func(i int) {
-		keep[i] = cb(i, input[i])
-	})
+		copy(local, (*slice)[start:end])
 
-	parIter.wg.Add(1)
-	go func() {
-		defer parIter.wg.Done()
-		predicateWG.Wait()
-
-		s := *slice
-		j := 0
-		for i, v := range input {
-			if keep[i] {
-				s[j] = v
-				j++
+		for i := start; i < end; i++ {
+			if cb(i, (*slice)[i]) {
+				local = append(local, (*slice)[i])
 			}
 		}
-		*slice = s[:j]
+
+		mu.Lock()
+		merge = append(merge, local...)
+		mu.Unlock()
+	}, opts...)
+
+	go func() {
+		<-p.jobsDoneCh
+		*slice = merge
+		p.postJobsDone()
 	}()
 
-	return parIter
+	return p
 }

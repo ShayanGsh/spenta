@@ -11,44 +11,52 @@ const (
 )
 
 type ParIter struct {
+	jobsWg *sync.WaitGroup
 	errors []error
-	mu     sync.Mutex
 
-	wg    *sync.WaitGroup
-	errCh chan error
-	done  chan struct{}
+	errCh          chan error
+	jobsDoneCh     chan struct{}
+	postJobsDoneCh chan struct{}
+
+	doneOnce sync.Once
 }
 
 func NewParIter() *ParIter {
 	p := &ParIter{
-		errors: []error{},
-		wg:     &sync.WaitGroup{},
-		errCh:  make(chan error),
-		done:   make(chan struct{}),
+		errors:         []error{},
+		jobsWg:         &sync.WaitGroup{},
+		jobsDoneCh:     make(chan struct{}),
+		postJobsDoneCh: make(chan struct{}),
+		errCh:          make(chan error),
+		doneOnce:       sync.Once{},
 	}
 
 	go func() {
 		for err := range p.errCh {
-			p.mu.Lock()
 			p.errors = append(p.errors, err)
-			p.mu.Unlock()
 		}
-		close(p.done)
+	}()
+
+	go func() {
+		p.jobsWg.Wait()
+		close(p.jobsDoneCh)
 	}()
 
 	return p
 }
 
 func (p *ParIter) Wait() error {
-	p.wg.Wait()
-
-	close(p.errCh)
-	<-p.done
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.doneOnce.Do(func() {
+		<-p.jobsDoneCh
+		<-p.postJobsDoneCh
+		close(p.errCh)
+	})
 
 	return errors.Join(p.errors...)
+}
+
+func (p *ParIter) postJobsDone() {
+	close(p.postJobsDoneCh)
 }
 
 type ParIterOptions struct {
