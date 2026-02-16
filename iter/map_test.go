@@ -1,147 +1,177 @@
 package iter
 
 import (
-	"fmt"
 	"reflect"
-	"slices"
 	"strings"
+	"sync"
 	"testing"
 )
 
-func TestSliceParFind_FindsFirstMatchingIndexAcrossChunks(t *testing.T) {
+func TestMapParForEach_VisitsAllPairsExactlyOnce(t *testing.T) {
 	t.Parallel()
 
-	arr := make([]int, 1000)
-	arr[120] = 7
-	arr[845] = 7
-	arr[999] = 7
-
-	res := SliceParFind(&arr, func(i int, v int) bool {
-		return v == 7
-	}, WithMaxChunkSize(64), WithMinChunkSize(16))
-
-	index, value, found, err := res.WaitResult()
-	if err != nil {
-		t.Fatalf("WaitResult() unexpected error: %v", err)
-	}
-	if !found {
-		t.Fatalf("expected found=true, got false")
-	}
-	if index != 120 {
-		t.Fatalf("expected first matching index=120, got %d", index)
-	}
-	if value != 7 {
-		t.Fatalf("expected value=7, got %d", value)
-	}
-}
-
-func TestSliceParFind_NoMatch(t *testing.T) {
-	t.Parallel()
-
-	arr := []int{1, 3, 5, 7, 9}
-
-	res := SliceParFind(&arr, func(i int, v int) bool {
-		return v%2 == 0
-	}, WithMaxChunkSize(2), WithMinChunkSize(1))
-
-	index, value, found, err := res.WaitResult()
-	if err != nil {
-		t.Fatalf("WaitResult() unexpected error: %v", err)
-	}
-	if found {
-		t.Fatalf("expected found=false, got true")
-	}
-	if index != -1 {
-		t.Fatalf("expected index=-1 when no match exists, got %d", index)
-	}
-	if value != 0 {
-		t.Fatalf("expected zero value when no match exists, got %d", value)
-	}
-}
-
-func TestSliceParFind_EmptySlice(t *testing.T) {
-	t.Parallel()
-
-	arr := []int{}
-
-	res := SliceParFind(&arr, func(i int, v int) bool {
-		return true
-	}, WithMaxChunkSize(2), WithMinChunkSize(1))
-
-	index, value, found, err := res.WaitResult()
-	if err != nil {
-		t.Fatalf("WaitResult() unexpected error: %v", err)
-	}
-	if found {
-		t.Fatalf("expected found=false for empty slice")
-	}
-	if index != -1 {
-		t.Fatalf("expected index=-1 for empty slice, got %d", index)
-	}
-	if value != 0 {
-		t.Fatalf("expected zero value for empty slice, got %d", value)
-	}
-}
-
-func TestSliceParFind_DoesNotMutateInput(t *testing.T) {
-	t.Parallel()
-
-	arr := []int{2, 4, 6, 8, 10, 12}
-	original := slices.Clone(arr)
-
-	res := SliceParFind(&arr, func(i int, v int) bool {
-		return v == 8
-	}, WithMaxChunkSize(3), WithMinChunkSize(1))
-
-	_, _, _, err := res.WaitResult()
-	if err != nil {
-		t.Fatalf("WaitResult() unexpected error: %v", err)
+	m := map[string]int{
+		"a": 1,
+		"b": 2,
+		"c": 3,
+		"d": 4,
+		"e": 5,
+		"f": 6,
 	}
 
-	if !reflect.DeepEqual(arr, original) {
-		t.Fatalf("slice was mutated: got=%v want=%v", arr, original)
-	}
-}
+	seen := map[string]int{}
+	var mu sync.Mutex
 
-func TestSliceParFind_WaitResultMatchesAccessors(t *testing.T) {
-	t.Parallel()
+	p := MapParForEach(&m, func(k string, v int) {
+		mu.Lock()
+		seen[k]++
+		mu.Unlock()
 
-	arr := []string{"a", "bb", "ccc", "dddd"}
-	res := SliceParFind(&arr, func(i int, v string) bool {
-		return len(v) > 2
-	}, WithMaxChunkSize(2), WithMinChunkSize(1))
-
-	index, value, found, err := res.WaitResult()
-	if err != nil {
-		t.Fatalf("WaitResult() unexpected error: %v", err)
-	}
-
-	if found != res.Found() || index != res.Index() || value != res.Value() {
-		t.Fatalf(
-			"inconsistent result state: wait=(%v,%d,%q) accessors=(%v,%d,%q)",
-			found, index, value,
-			res.Found(), res.Index(), res.Value(),
-		)
-	}
-}
-
-func TestSliceParFind_CapturesPanicsAsError(t *testing.T) {
-	t.Parallel()
-
-	arr := []int{1, 2, 3, 4}
-
-	res := SliceParFind(&arr, func(i int, v int) bool {
-		if i == 2 {
-			panic("slice find panic")
+		if source, ok := m[k]; !ok || source != v {
+			t.Fatalf("mismatch for key %q: callback value=%d map value=%d", k, v, source)
 		}
-		return false
-	}, WithMaxChunkSize(32), WithMinChunkSize(1))
+	}, WithMaxChunkSize(2), WithMinChunkSize(1))
 
-	_, _, _, err := res.WaitResult()
+	if err := p.Wait(); err != nil {
+		t.Fatalf("Wait() unexpected error: %v", err)
+	}
+
+	if len(seen) != len(m) {
+		t.Fatalf("expected %d visited keys, got %d", len(m), len(seen))
+	}
+	for k := range m {
+		if seen[k] != 1 {
+			t.Fatalf("key %q processed %d times, expected 1", k, seen[k])
+		}
+	}
+}
+
+func TestMapParForEach_CapturesPanicsAsError(t *testing.T) {
+	t.Parallel()
+
+	m := map[string]int{"a": 1, "b": 2}
+	p := MapParForEach(&m, func(k string, v int) {
+		if k == "b" {
+			panic("map foreach panic")
+		}
+	}, WithMaxChunkSize(2), WithMinChunkSize(1))
+
+	err := p.Wait()
 	if err == nil {
 		t.Fatalf("expected panic to be captured as error, got nil")
 	}
-	if !strings.Contains(err.Error(), "slice find panic") {
+	if !strings.Contains(err.Error(), "map foreach panic") {
+		t.Fatalf("expected panic message in error, got %v", err)
+	}
+}
+
+func TestMapParMap_TransformsValues(t *testing.T) {
+	t.Parallel()
+
+	m := map[string]int{
+		"a": 1,
+		"b": 2,
+		"c": 3,
+		"d": 4,
+	}
+
+	p := MapParMap(&m, func(k string, v int) int {
+		return v * 10
+	}, WithMaxChunkSize(uint(len(m)+1)), WithMinChunkSize(1))
+
+	if err := p.Wait(); err != nil {
+		t.Fatalf("Wait() unexpected error: %v", err)
+	}
+
+	want := map[string]int{
+		"a": 10,
+		"b": 20,
+		"c": 30,
+		"d": 40,
+	}
+	if !reflect.DeepEqual(m, want) {
+		t.Fatalf("unexpected mapped map: got=%v want=%v", m, want)
+	}
+}
+
+func TestMapParMap_CapturesPanicsAsError(t *testing.T) {
+	t.Parallel()
+
+	m := map[string]int{"a": 1, "b": 2, "c": 3}
+	p := MapParMap(&m, func(k string, v int) int {
+		if k == "b" {
+			panic("map map panic")
+		}
+		return v
+	}, WithMaxChunkSize(uint(len(m)+1)), WithMinChunkSize(1))
+
+	err := p.Wait()
+	if err == nil {
+		t.Fatalf("expected panic to be captured as error, got nil")
+	}
+	if !strings.Contains(err.Error(), "map map panic") {
+		t.Fatalf("expected panic message in error, got %v", err)
+	}
+}
+
+func TestMapParFilter_KeepsOnlyMatchingPairs(t *testing.T) {
+	t.Parallel()
+
+	m := map[string]int{
+		"a": 1,
+		"b": 2,
+		"c": 3,
+		"d": 4,
+		"e": 5,
+	}
+
+	p := MapParFilter(&m, func(k string, v int) bool {
+		return v%2 == 0
+	}, WithMaxChunkSize(uint(len(m)+1)), WithMinChunkSize(1))
+
+	if err := p.Wait(); err != nil {
+		t.Fatalf("Wait() unexpected error: %v", err)
+	}
+
+	want := map[string]int{"b": 2, "d": 4}
+	if !reflect.DeepEqual(m, want) {
+		t.Fatalf("unexpected filtered map: got=%v want=%v", m, want)
+	}
+}
+
+func TestMapParFilter_NoMatchesResultsInEmptyMap(t *testing.T) {
+	t.Parallel()
+
+	m := map[string]int{"a": 1, "b": 3, "c": 5}
+
+	p := MapParFilter(&m, func(k string, v int) bool {
+		return false
+	}, WithMaxChunkSize(uint(len(m)+1)), WithMinChunkSize(1))
+
+	if err := p.Wait(); err != nil {
+		t.Fatalf("Wait() unexpected error: %v", err)
+	}
+	if len(m) != 0 {
+		t.Fatalf("expected empty map after filter, got %v", m)
+	}
+}
+
+func TestMapParFilter_CapturesPanicsAsError(t *testing.T) {
+	t.Parallel()
+
+	m := map[string]int{"a": 1, "b": 2, "c": 3}
+	p := MapParFilter(&m, func(k string, v int) bool {
+		if k == "b" {
+			panic("map filter panic")
+		}
+		return true
+	}, WithMaxChunkSize(uint(len(m)+1)), WithMinChunkSize(1))
+
+	err := p.Wait()
+	if err == nil {
+		t.Fatalf("expected panic to be captured as error, got nil")
+	}
+	if !strings.Contains(err.Error(), "map filter panic") {
 		t.Fatalf("expected panic message in error, got %v", err)
 	}
 }
@@ -286,7 +316,7 @@ func TestMapParFind_CapturesPanicsAsError(t *testing.T) {
 
 	res := MapParFind(&m, func(k string, v int) bool {
 		if k == "b" {
-			panic(fmt.Sprintf("map find panic key=%s", k))
+			panic("map find panic")
 		}
 		return false
 	}, WithMaxChunkSize(32), WithMinChunkSize(1))
@@ -295,7 +325,7 @@ func TestMapParFind_CapturesPanicsAsError(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected panic to be captured as error, got nil")
 	}
-	if !strings.Contains(err.Error(), "map find panic key=") {
+	if !strings.Contains(err.Error(), "map find panic") {
 		t.Fatalf("expected panic message in error, got %v", err)
 	}
 }
