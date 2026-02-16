@@ -21,6 +21,7 @@ func NewMapParIter[K comparable, V any](Map *map[K]V, cb func(start, end int, ke
 	pool.SpawnJob(0, length, int(options.MaxChunkSize), int(options.MinChunkSize), parIter.jobsWg, parIter.errCh, func(start, end int) {
 		cb(start, end, keys)
 	})
+	parIter.startJobsDoneWatcher()
 
 	return parIter
 }

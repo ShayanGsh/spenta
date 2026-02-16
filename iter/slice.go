@@ -24,6 +24,7 @@ func newSliceParIter[V any](slice *[]V, cb func(start, end int), opts ...ParIter
 			cb(start, end)
 		},
 	)
+	parIter.startJobsDoneWatcher()
 
 	return parIter
 }
